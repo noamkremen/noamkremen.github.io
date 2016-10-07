@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><title>Python Tidbitarium</title><link href="https://noamkremen.github.io/" rel="alternate"></link><link href="https://noamkremen.github.io/feeds/python.atom.xml" rel="self"></link><id>https://noamkremen.github.io/</id><updated>2016-10-07T13:31:38+02:00</updated><entry><title>A Simple threadsafe caching decorator</title><link href="https://noamkremen.github.io/a-simple-threadsafe-caching-decorator.html" rel="alternate"></link><published>2016-10-07T13:31:38+02:00</published><updated>2016-10-07T13:31:38+02:00</updated><author><name>Noam Kremen</name></author><id>tag:noamkremen.github.io,2016-10-07:a-simple-threadsafe-caching-decorator.html</id><summary type="html">&lt;p&gt;Recently I've encountered a scenario where  I needed to cache the results 
+<feed xmlns="http://www.w3.org/2005/Atom"><title>Python Tidbitarium</title><link href="https://noamkremen.github.io/" rel="alternate"></link><link href="https://noamkremen.github.io/feeds/python.atom.xml" rel="self"></link><id>https://noamkremen.github.io/</id><updated>2016-10-07T13:35:59+02:00</updated><entry><title>A Simple threadsafe caching decorator</title><link href="https://noamkremen.github.io/a-simple-threadsafe-caching-decorator.html" rel="alternate"></link><published>2016-10-07T13:35:59+02:00</published><updated>2016-10-07T13:35:59+02:00</updated><author><name>Noam Kremen</name></author><id>tag:noamkremen.github.io,2016-10-07:a-simple-threadsafe-caching-decorator.html</id><summary type="html">&lt;p&gt;Recently I've encountered a scenario where  I needed to cache the results 
 of calls to an I/O-related function f(). f() took a few seconds to execute,
 and I needed to take into account a scenario where the call to f() could come from several threads at once.
 The builtin functools module provides the lru_cache decorator, which fixes 
@@ -36,7 +36,7 @@ original lru_cache implementation.&lt;/p&gt;
 &lt;p&gt;So, the first thing that you can see here, is that no wheels are reinvented.&lt;br /&gt;
 I'm still using the lru_cache and _make_key functions provided by functools.
 All that is left to do is to block the execution of a function if an identical call
-is already in flight. This is done in the same way lru_cache() does it 
+is already in flight. Deciding whether two funciton calls are identical is done in the same way lru_cache() does it 
  - by using the _make_key function to create a unique key based on the 
 function parameters. The corresponding lock in lock_dict is then acquired 
 (creating it, if it does not yet exist), making all other calls with the 
