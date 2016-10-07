@@ -23,7 +23,7 @@
                 <article>
                     <h1 class="entry-title"><a href="https://noamkremen.github.io/a-simple-threadsafe-caching-decorator.html">A Simple threadsafe caching decorator</a></h1>
 <footer class="post-info">
-        <abbr class="published" title="2016-10-07T13:22:10.745371+02:00">
+        <abbr class="published" title="2016-10-07T13:31:38.872128+02:00">
                 Published: Fri 07 October 2016
         </abbr>
 
@@ -195,8 +195,8 @@ The output shows that only one them is actually executed while the other
 will wait for five seconds for the result to become available in the cache. 
 The second batch of jobs is launched a second later and has four seconds 
 to wait until the cache is ready. </p>
-<p><strong>Why you probably shouldn't use this code as-is</strong>
-Adding the missing 'typed' decorator argument (when typed=True,  _make_key
+<p><strong>Why you probably shouldn't use this code as-is</strong></p>
+<p>Adding the missing 'typed' decorator argument (when typed=True,  _make_key
 treats 3 and 3.0 differently) is relatively straightforward,I just wanted 
 to avoid here the extra level of indentation that comes when implementing 
 a parametrized decorator. 
@@ -217,7 +217,6 @@ a cached result is already available.</p>                </article>
                             <li><a href="http://getpelican.com/">Pelican</a></li>
                             <li><a href="http://python.org/">Python.org</a></li>
                             <li><a href="http://jinja.pocoo.org/">Jinja2</a></li>
-                            <li><a href="#">You can modify those links in your config file</a></li>
                         </ul>
                 </div><!-- /.blogroll -->
                 <div class="social">
@@ -225,8 +224,6 @@ a cached result is already available.</p>                </article>
                         <ul>
                             <li><a href="https://noamkremen.github.io/feeds/all.atom.xml" type="application/atom+xml" rel="alternate">atom feed</a></li>
 
-                            <li><a href="#">You can add links in your config file</a></li>
-                            <li><a href="#">Another social link</a></li>
                         </ul>
                 </div><!-- /.social -->
         </section><!-- /#extras -->
