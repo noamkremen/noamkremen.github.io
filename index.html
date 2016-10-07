@@ -21,7 +21,207 @@
 
             <aside id="featured" class="body">
                 <article>
-                    <h1 class="entry-title"><a href="https://noamkremen.github.io/my-super-post.html">My super title</a></h1>
+                    <h1 class="entry-title"><a href="https://noamkremen.github.io/a-simple-threadsafe-caching-decorator.html">A Simple threadsafe caching decorator</a></h1>
+<footer class="post-info">
+        <abbr class="published" title="2016-10-07T13:22:10.745371+02:00">
+                Published: Fri 07 October 2016
+        </abbr>
+
+        <address class="vcard author">
+                By                         <a class="url fn" href="https://noamkremen.github.io/author/noam-kremen.html">Noam Kremen</a>
+        </address>
+<p>In <a href="https://noamkremen.github.io/category/python.html">Python</a>.</p>
+<p>tags: <a href="https://noamkremen.github.io/tag/python.html">python</a> <a href="https://noamkremen.github.io/tag/decorator.html">decorator</a> <a href="https://noamkremen.github.io/tag/multi-threading.html">multi-threading</a> </p>
+</footer><!-- /.post-info --><p>Recently I've encountered a scenario where  I needed to cache the results 
+of calls to an I/O-related function f(). f() took a few seconds to execute,
+and I needed to take into account a scenario where the call to f() could come from several threads at once.
+The builtin functools module provides the lru_cache decorator, which fixes 
+half of my problem: once the first call to an lru_cache decorated function 
+is complete, any subsequent calls with the same arguments from any other
+thread will use the cached result. In a multi-threaded scenario, this is
+not quite enough - once thread A called f(), any other thread B could have
+made an identical call to f'() while f() was still in flight. f'() would then 
+be executed since the cache does not have the result of f() yet.
+The desired behaviour would be to make f'() wait until f() is done and 
+then use the cached result. To achieve this, I've built a simple threadsafe 
+LRU cache decorator which handles both caching and thread synchronization.
+The implementation is below, followed by a brief explanation on how it works 
+and why it is threadsafe. For clarity, I've omitted  the @wraps decorator, 
+and also the <em>typed</em> and <em>max_size</em> optional arguments which are present in the
+original lru_cache implementation.</p>
+<div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">threading</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">lru_cache</span><span class="p">,</span> <span class="n">_make_key</span>
+
+<span class="k">def</span> <span class="nf">threadsafe_lru</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+    <span class="n">func</span> <span class="o">=</span> <span class="n">lru_cache</span><span class="p">()(</span><span class="n">func</span><span class="p">)</span>
+    <span class="n">lock_dict</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="n">threading</span><span class="o">.</span><span class="n">Lock</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_thread_lru</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="n">_make_key</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">,</span> <span class="n">typed</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>  
+        <span class="k">with</span> <span class="n">lock_dict</span><span class="p">[</span><span class="n">key</span><span class="p">]:</span>
+            <span class="k">return</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">_thread_lru</span>
+</pre></div>
+
+
+<p>So, the first thing that you can see here, is that no wheels are reinvented.<br />
+I'm still using the lru_cache and _make_key functions provided by functools.
+All that is left to do is to block the execution of a function if an identical call
+is already in flight. This is done in the same way lru_cache() does it 
+ - by using the _make_key function to create a unique key based on the 
+function parameters. The corresponding lock in lock_dict is then acquired 
+(creating it, if it does not yet exist), making all other calls with the 
+same arguments wait until the result of the first call is cached and ready.
+Any other calls with different parameters, will have a different 'key' and 
+will consequentally acquire a different lock. This way, calls with different 
+parameter combinations do not interfere with each other.</p>
+<p>An important nuance comes up at this point - in CPython dict lookups and 
+insertions are threadsafe. However, this is a defaultdict - while the lookups 
+and insertions are still threadsafe, the callable defaultdict uses to create 
+a missing key might not be, causing a race condition where two different 
+threads attempt to create a new threading.Lock and then assign it to the same key. 
+However, in this particular case and as long as you are running CPython,
+defaultdict(threading.Lock) is threadsafe - (see <a href="http://stackoverflow.com/questions/17682484/is-collections-defaultdict-thread-safe">here</a> for an explanation).</p>
+<p>The following example submits 10 jobs to a threadpool in two duplicate 
+batches -  B1 and B2.  B2 is submitted with a slight delay while B1 is 
+still in-flight.  Note both the run timings and the 'Executing..' messages. 
+In a naive cache implementation the calls in B2 would be executed anyway
+since the lru_cache would not be ready yet.</p>
+<div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">threading</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">lru_cache</span><span class="p">,</span> <span class="n">_make_key</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">from</span> <span class="nn">time</span> <span class="kn">import</span> <span class="n">sleep</span>
+<span class="kn">from</span> <span class="nn">random</span> <span class="kn">import</span> <span class="n">randint</span><span class="p">,</span> <span class="n">seed</span>
+<span class="kn">from</span> <span class="nn">concurrent.futures</span> <span class="kn">import</span> <span class="n">ThreadPoolExecutor</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">partial</span>
+
+<span class="n">sleep_length</span> <span class="o">=</span> <span class="mi">5</span>
+<span class="n">seed</span><span class="p">(</span><span class="mi">123</span><span class="p">)</span>
+<span class="n">arg_range</span> <span class="o">=</span> <span class="mi">3</span>
+<span class="n">num_tasks</span> <span class="o">=</span> <span class="mi">5</span>
+
+<span class="k">def</span> <span class="nf">threadsafe_lru</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+    <span class="n">func</span> <span class="o">=</span> <span class="n">lru_cache</span><span class="p">()(</span><span class="n">func</span><span class="p">)</span>
+    <span class="n">lock_dict</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="n">threading</span><span class="o">.</span><span class="n">Lock</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_thread_lru</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="n">_make_key</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">,</span> <span class="n">typed</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>  
+        <span class="k">with</span> <span class="n">lock_dict</span><span class="p">[</span><span class="n">key</span><span class="p">]:</span>
+            <span class="k">return</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">_thread_lru</span>
+
+
+
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">comment out this decorator (or replace it with @lru_cache) </span>
+<span class="sd">and take a look at the results</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="nd">@threadsafe_lru</span>  
+<span class="k">def</span> <span class="nf">long_running_function</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+    <span class="k">print</span><span class="p">(</span><span class="s2">&quot;Executing with x={}, y={}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">))</span>
+    <span class="n">sleep</span><span class="p">(</span><span class="n">sleep_length</span><span class="p">)</span>
+
+
+
+<span class="n">func_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">partial</span><span class="p">(</span><span class="n">long_running_function</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">arg_range</span><span class="p">)</span>
+                     <span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">arg_range</span><span class="p">))</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_tasks</span><span class="p">)]</span>
+
+
+<span class="k">def</span> <span class="nf">create_timing_callback</span><span class="p">(</span><span class="n">fn_id</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="n">start_time</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">timer</span><span class="p">(</span><span class="n">future</span><span class="p">):</span>
+        <span class="n">exec_time</span> <span class="o">=</span> <span class="nb">round</span><span class="p">((</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time</span><span class="p">)</span><span class="o">.</span><span class="n">total_seconds</span><span class="p">())</span>
+        <span class="k">print</span><span class="p">(</span><span class="s2">&quot;Total run time of {} seconds for job  #{} called with {}, {}&quot;</span>
+            <span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">exec_time</span><span class="p">,</span> <span class="n">fn_id</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">timer</span>
+
+
+<span class="k">with</span> <span class="n">ThreadPoolExecutor</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span> <span class="k">as</span> <span class="n">executor</span><span class="p">:</span>
+    <span class="n">fn_id</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]:</span>
+        <span class="k">print</span><span class="p">(</span><span class="s2">&quot;Batch {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">batch</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">fn</span> <span class="ow">in</span> <span class="n">func_list</span><span class="p">:</span>
+            <span class="k">print</span><span class="p">(</span><span class="s2">&quot;Submitting job #{} with parameters {}&quot;</span>
+            <span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">fn_id</span><span class="p">,</span> <span class="n">fn</span><span class="o">.</span><span class="n">keywords</span><span class="p">))</span>
+            <span class="n">fut</span> <span class="o">=</span> <span class="n">executor</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">fn</span><span class="p">)</span>
+            <span class="n">fut</span><span class="o">.</span><span class="n">add_done_callback</span><span class="p">(</span><span class="n">create_timing_callback</span><span class="p">(</span><span class="n">fn_id</span><span class="p">,</span> <span class="n">fn</span><span class="o">.</span><span class="n">keywords</span><span class="p">))</span>
+            <span class="n">fn_id</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">sleep</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="s2">&quot;Waiting for results..&quot;</span><span class="p">)</span>
+    <span class="n">executor</span><span class="o">.</span><span class="n">shutdown</span><span class="p">(</span><span class="n">wait</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+</pre></div>
+
+
+<p>Running this code with python 3.5.1, should produce: </p>
+<div class="highlight"><pre><span></span><span class="n">Batch</span> <span class="mi">0</span>
+<span class="n">Submitting</span> <span class="n">function</span> <span class="c1">#0 with parameters {&#39;x&#39;: 0, &#39;y&#39;: 2}</span>
+<span class="n">Executing</span> <span class="k">with</span> <span class="n">x</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mi">2</span>
+<span class="n">Submitting</span> <span class="n">function</span> <span class="c1">#1 with parameters {&#39;x&#39;: 0, &#39;y&#39;: 3}</span>
+<span class="n">Executing</span> <span class="k">with</span> <span class="n">x</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mi">3</span>
+<span class="n">Submitting</span> <span class="n">function</span> <span class="c1">#2 with parameters {&#39;x&#39;: 2, &#39;y&#39;: 0}</span>
+<span class="n">Executing</span> <span class="k">with</span> <span class="n">x</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mi">0</span>
+<span class="n">Submitting</span> <span class="n">function</span> <span class="c1">#3 with parameters {&#39;x&#39;: 0, &#39;y&#39;: 3}</span>
+<span class="n">Submitting</span> <span class="n">function</span> <span class="c1">#4 with parameters {&#39;x&#39;: 2, &#39;y&#39;: 2}</span>
+<span class="n">Executing</span> <span class="k">with</span> <span class="n">x</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mi">2</span>
+<span class="n">Batch</span> <span class="mi">1</span>
+<span class="n">Submitting</span> <span class="n">function</span> <span class="c1">#5 with parameters {&#39;x&#39;: 0, &#39;y&#39;: 2}</span>
+<span class="n">Submitting</span> <span class="n">function</span> <span class="c1">#6 with parameters {&#39;x&#39;: 0, &#39;y&#39;: 3}</span>
+<span class="n">Submitting</span> <span class="n">function</span> <span class="c1">#7 with parameters {&#39;x&#39;: 2, &#39;y&#39;: 0}</span>
+<span class="n">Submitting</span> <span class="n">function</span> <span class="c1">#8 with parameters {&#39;x&#39;: 0, &#39;y&#39;: 3}</span>
+<span class="n">Submitting</span> <span class="n">function</span> <span class="c1">#9 with parameters {&#39;x&#39;: 2, &#39;y&#39;: 2}</span>
+<span class="n">Waiting</span> <span class="k">for</span> <span class="n">results</span><span class="o">..</span>
+<span class="n">Total</span> <span class="n">run</span> <span class="n">time</span> <span class="n">of</span> <span class="mi">5</span> <span class="n">seconds</span> <span class="k">for</span> <span class="n">function</span>  <span class="c1">#1 called with ({&#39;x&#39;: 0, &#39;y&#39;: 3},), {}</span>
+<span class="n">Total</span> <span class="n">run</span> <span class="n">time</span> <span class="n">of</span> <span class="mi">5</span> <span class="n">seconds</span> <span class="k">for</span> <span class="n">function</span>  <span class="c1">#3 called with ({&#39;x&#39;: 0, &#39;y&#39;: 3},), {}</span>
+<span class="n">Total</span> <span class="n">run</span> <span class="n">time</span> <span class="n">of</span> <span class="mi">4</span> <span class="n">seconds</span> <span class="k">for</span> <span class="n">function</span>  <span class="c1">#6 called with ({&#39;x&#39;: 0, &#39;y&#39;: 3},), {}</span>
+<span class="n">Total</span> <span class="n">run</span> <span class="n">time</span> <span class="n">of</span> <span class="mi">4</span> <span class="n">seconds</span> <span class="k">for</span> <span class="n">function</span>  <span class="c1">#8 called with ({&#39;x&#39;: 0, &#39;y&#39;: 3},), {}</span>
+<span class="n">Total</span> <span class="n">run</span> <span class="n">time</span> <span class="n">of</span> <span class="mi">5</span> <span class="n">seconds</span> <span class="k">for</span> <span class="n">function</span>  <span class="c1">#2 called with ({&#39;x&#39;: 2, &#39;y&#39;: 0},), {}</span>
+<span class="n">Total</span> <span class="n">run</span> <span class="n">time</span> <span class="n">of</span> <span class="mi">4</span> <span class="n">seconds</span> <span class="k">for</span> <span class="n">function</span>  <span class="c1">#7 called with ({&#39;x&#39;: 2, &#39;y&#39;: 0},), {}</span>
+<span class="n">Total</span> <span class="n">run</span> <span class="n">time</span> <span class="n">of</span> <span class="mi">5</span> <span class="n">seconds</span> <span class="k">for</span> <span class="n">function</span>  <span class="c1">#0 called with ({&#39;x&#39;: 0, &#39;y&#39;: 2},), {}</span>
+<span class="n">Total</span> <span class="n">run</span> <span class="n">time</span> <span class="n">of</span> <span class="mi">4</span> <span class="n">seconds</span> <span class="k">for</span> <span class="n">function</span>  <span class="c1">#5 called with ({&#39;x&#39;: 0, &#39;y&#39;: 2},), {}</span>
+<span class="n">Total</span> <span class="n">run</span> <span class="n">time</span> <span class="n">of</span> <span class="mi">5</span> <span class="n">seconds</span> <span class="k">for</span> <span class="n">function</span>  <span class="c1">#4 called with ({&#39;x&#39;: 2, &#39;y&#39;: 2},), {}</span>
+<span class="n">Total</span> <span class="n">run</span> <span class="n">time</span> <span class="n">of</span> <span class="mi">4</span> <span class="n">seconds</span> <span class="k">for</span> <span class="n">function</span>  <span class="c1">#9 called with ({&#39;x&#39;: 2, &#39;y&#39;: 2},), {}</span>
+</pre></div>
+
+
+<p>In the first batch, there are two calls to long_running_function(x=0, y=3)
+The output shows that only one them is actually executed while the other 
+will wait for five seconds for the result to become available in the cache. 
+The second batch of jobs is launched a second later and has four seconds 
+to wait until the cache is ready. </p>
+<p><strong>Why you probably shouldn't use this code as-is</strong>
+Adding the missing 'typed' decorator argument (when typed=True,  _make_key
+treats 3 and 3.0 differently) is relatively straightforward,I just wanted 
+to avoid here the extra level of indentation that comes when implementing 
+a parametrized decorator. 
+The trickier part is implementing 'max_size'. When len(lock_dict)&gt;max_size, 
+old Locks need to be discarded. Therefore, we need to know which locks are 
+'old' (an OrderedDict might help) and we need to check len(lock_dict(
+each time we insert a new key/threadlock pair. Since several threads might 
+attempt to add several different keys, another lock is needed to make access 
+to lock_dict threadsafe. This might not affect performance in a significant 
+way in most scenarios, but bugs me on a personal level since function calls 
+might briefly wait on each other even when they are not duplicates and when 
+a cached result is already available.</p>                </article>
+            </aside><!-- /#featured -->
+                <section id="content" class="body">
+                    <h1>Other articles</h1>
+                    <hr />
+                    <ol id="posts-list" class="hfeed">
+
+            <li><article class="hentry">
+                <header>
+                    <h1><a href="https://noamkremen.github.io/my-super-post.html" rel="bookmark"
+                           title="Permalink to My super title">My super title</a></h1>
+                </header>
+
+                <div class="entry-content">
 <footer class="post-info">
         <abbr class="published" title="2010-12-03T10:20:00+01:00">
                 Published: Fri 03 December 2010
@@ -37,12 +237,10 @@
         </address>
 <p>In <a href="https://noamkremen.github.io/category/python.html">Python</a>.</p>
 <p>tags: <a href="https://noamkremen.github.io/tag/pelican.html">pelican</a> <a href="https://noamkremen.github.io/tag/publishing.html">publishing</a> </p>
-</footer><!-- /.post-info --><p>CCYYYYXXX!!!!!This is the content of my super blog post.</p>                </article>
-            </aside><!-- /#featured -->
-                <section id="content" class="body">
-                    <h1>Other articles</h1>
-                    <hr />
-                    <ol id="posts-list" class="hfeed">
+</footer><!-- /.post-info -->                <p>Short version for index and feeds</p>
+                <a class="readmore" href="https://noamkremen.github.io/my-super-post.html">read more</a>
+                </div><!-- /.entry-content -->
+            </article></li>
 
             <li><article class="hentry">
                 <header>
