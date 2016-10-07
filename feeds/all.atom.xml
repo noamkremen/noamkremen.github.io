@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><title>Python Tidbitarium</title><link href="https://noamkremen.github.io/" rel="alternate"></link><link href="https://noamkremen.github.io/feeds/all.atom.xml" rel="self"></link><id>https://noamkremen.github.io/</id><updated>2016-10-07T13:35:59+02:00</updated><entry><title>A Simple threadsafe caching decorator</title><link href="https://noamkremen.github.io/a-simple-threadsafe-caching-decorator.html" rel="alternate"></link><published>2016-10-07T13:35:59+02:00</published><updated>2016-10-07T13:35:59+02:00</updated><author><name>Noam Kremen</name></author><id>tag:noamkremen.github.io,2016-10-07:a-simple-threadsafe-caching-decorator.html</id><summary type="html">&lt;p&gt;Recently I've encountered a scenario where  I needed to cache the results 
+<feed xmlns="http://www.w3.org/2005/Atom"><title>Python Tidbitarium</title><link href="https://noamkremen.github.io/" rel="alternate"></link><link href="https://noamkremen.github.io/feeds/all.atom.xml" rel="self"></link><id>https://noamkremen.github.io/</id><updated>2016-10-07T14:06:25+02:00</updated><entry><title>A simple threadsafe caching decorator</title><link href="https://noamkremen.github.io/a-simple-threadsafe-caching-decorator.html" rel="alternate"></link><published>2016-10-07T14:06:25+02:00</published><updated>2016-10-07T14:06:25+02:00</updated><author><name>Noam Kremen</name></author><id>tag:noamkremen.github.io,2016-10-07:a-simple-threadsafe-caching-decorator.html</id><summary type="html">&lt;p&gt;Recently I've encountered a scenario where  I needed to cache the results 
 of calls to an I/O-related function f(). f() took a few seconds to execute,
 and I needed to take into account a scenario where the call to f() could come from several threads at once.
 The builtin functools module provides the lru_cache decorator, which fixes 
@@ -38,12 +38,12 @@ I'm still using the lru_cache and _make_key functions provided by functools.
 All that is left to do is to block the execution of a function if an identical call
 is already in flight. Deciding whether two funciton calls are identical is done in the same way lru_cache() does it 
  - by using the _make_key function to create a unique key based on the 
-function parameters. The corresponding lock in lock_dict is then acquired 
+function arguments. The corresponding lock in lock_dict is then acquired 
 (creating it, if it does not yet exist), making all other calls with the 
 same arguments wait until the result of the first call is cached and ready.
-Any other calls with different parameters, will have a different 'key' and 
+Any other calls with different arguments, will have a different 'key' and 
 will consequentally acquire a different lock. This way, calls with different 
-parameter combinations do not interfere with each other.&lt;/p&gt;
+argument values do not interfere with each other.&lt;/p&gt;
 &lt;p&gt;An important nuance comes up at this point - in CPython dict lookups and 
 insertions are threadsafe. However, this is a defaultdict - while the lookups 
 and insertions are still threadsafe, the callable defaultdict uses to create 
@@ -115,7 +115,7 @@ since the lru_cache would not be ready yet.&lt;/p&gt;
     &lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="n"&gt;batch&lt;/span&gt; &lt;span class="ow"&gt;in&lt;/span&gt; &lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;]:&lt;/span&gt;
         &lt;span class="k"&gt;print&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s2"&gt;&amp;quot;Batch {}&amp;quot;&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;format&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;batch&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt;
         &lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="n"&gt;fn&lt;/span&gt; &lt;span class="ow"&gt;in&lt;/span&gt; &lt;span class="n"&gt;func_list&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt;
-            &lt;span class="k"&gt;print&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s2"&gt;&amp;quot;Submitting job #{} with parameters {}&amp;quot;&lt;/span&gt;
+            &lt;span class="k"&gt;print&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s2"&gt;&amp;quot;Submitting job #{} with arguments {}&amp;quot;&lt;/span&gt;
             &lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;format&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;fn_id&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;fn&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;keywords&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt;
             &lt;span class="n"&gt;fut&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;executor&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;submit&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;fn&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
             &lt;span class="n"&gt;fut&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;add_done_callback&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;create_timing_callback&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;fn_id&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;fn&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;keywords&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt;
@@ -126,23 +126,23 @@ since the lru_cache would not be ready yet.&lt;/p&gt;
 &lt;/pre&gt;&lt;/div&gt;
 
 
-&lt;p&gt;Running this code with python 3.5.1, should produce: &lt;/p&gt;
+&lt;p&gt;Running this code with (tested with python3.5.1) should produce: &lt;/p&gt;
 &lt;div class="highlight"&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;span class="n"&gt;Batch&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;
-&lt;span class="n"&gt;Submitting&lt;/span&gt; &lt;span class="n"&gt;function&lt;/span&gt; &lt;span class="c1"&gt;#0 with parameters {&amp;#39;x&amp;#39;: 0, &amp;#39;y&amp;#39;: 2}&lt;/span&gt;
+&lt;span class="n"&gt;Submitting&lt;/span&gt; &lt;span class="n"&gt;function&lt;/span&gt; &lt;span class="c1"&gt;#0 with arguments {&amp;#39;x&amp;#39;: 0, &amp;#39;y&amp;#39;: 2}&lt;/span&gt;
 &lt;span class="n"&gt;Executing&lt;/span&gt; &lt;span class="k"&gt;with&lt;/span&gt; &lt;span class="n"&gt;x&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;y&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="mi"&gt;2&lt;/span&gt;
-&lt;span class="n"&gt;Submitting&lt;/span&gt; &lt;span class="n"&gt;function&lt;/span&gt; &lt;span class="c1"&gt;#1 with parameters {&amp;#39;x&amp;#39;: 0, &amp;#39;y&amp;#39;: 3}&lt;/span&gt;
+&lt;span class="n"&gt;Submitting&lt;/span&gt; &lt;span class="n"&gt;function&lt;/span&gt; &lt;span class="c1"&gt;#1 with arguments {&amp;#39;x&amp;#39;: 0, &amp;#39;y&amp;#39;: 3}&lt;/span&gt;
 &lt;span class="n"&gt;Executing&lt;/span&gt; &lt;span class="k"&gt;with&lt;/span&gt; &lt;span class="n"&gt;x&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;y&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="mi"&gt;3&lt;/span&gt;
-&lt;span class="n"&gt;Submitting&lt;/span&gt; &lt;span class="n"&gt;function&lt;/span&gt; &lt;span class="c1"&gt;#2 with parameters {&amp;#39;x&amp;#39;: 2, &amp;#39;y&amp;#39;: 0}&lt;/span&gt;
+&lt;span class="n"&gt;Submitting&lt;/span&gt; &lt;span class="n"&gt;function&lt;/span&gt; &lt;span class="c1"&gt;#2 with arguments {&amp;#39;x&amp;#39;: 2, &amp;#39;y&amp;#39;: 0}&lt;/span&gt;
 &lt;span class="n"&gt;Executing&lt;/span&gt; &lt;span class="k"&gt;with&lt;/span&gt; &lt;span class="n"&gt;x&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="mi"&gt;2&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;y&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="mi"&gt;0&lt;/span&gt;
-&lt;span class="n"&gt;Submitting&lt;/span&gt; &lt;span class="n"&gt;function&lt;/span&gt; &lt;span class="c1"&gt;#3 with parameters {&amp;#39;x&amp;#39;: 0, &amp;#39;y&amp;#39;: 3}&lt;/span&gt;
-&lt;span class="n"&gt;Submitting&lt;/span&gt; &lt;span class="n"&gt;function&lt;/span&gt; &lt;span class="c1"&gt;#4 with parameters {&amp;#39;x&amp;#39;: 2, &amp;#39;y&amp;#39;: 2}&lt;/span&gt;
+&lt;span class="n"&gt;Submitting&lt;/span&gt; &lt;span class="n"&gt;function&lt;/span&gt; &lt;span class="c1"&gt;#3 with arguments {&amp;#39;x&amp;#39;: 0, &amp;#39;y&amp;#39;: 3}&lt;/span&gt;
+&lt;span class="n"&gt;Submitting&lt;/span&gt; &lt;span class="n"&gt;function&lt;/span&gt; &lt;span class="c1"&gt;#4 with arguments {&amp;#39;x&amp;#39;: 2, &amp;#39;y&amp;#39;: 2}&lt;/span&gt;
 &lt;span class="n"&gt;Executing&lt;/span&gt; &lt;span class="k"&gt;with&lt;/span&gt; &lt;span class="n"&gt;x&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="mi"&gt;2&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;y&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="mi"&gt;2&lt;/span&gt;
 &lt;span class="n"&gt;Batch&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt;
-&lt;span class="n"&gt;Submitting&lt;/span&gt; &lt;span class="n"&gt;function&lt;/span&gt; &lt;span class="c1"&gt;#5 with parameters {&amp;#39;x&amp;#39;: 0, &amp;#39;y&amp;#39;: 2}&lt;/span&gt;
-&lt;span class="n"&gt;Submitting&lt;/span&gt; &lt;span class="n"&gt;function&lt;/span&gt; &lt;span class="c1"&gt;#6 with parameters {&amp;#39;x&amp;#39;: 0, &amp;#39;y&amp;#39;: 3}&lt;/span&gt;
-&lt;span class="n"&gt;Submitting&lt;/span&gt; &lt;span class="n"&gt;function&lt;/span&gt; &lt;span class="c1"&gt;#7 with parameters {&amp;#39;x&amp;#39;: 2, &amp;#39;y&amp;#39;: 0}&lt;/span&gt;
-&lt;span class="n"&gt;Submitting&lt;/span&gt; &lt;span class="n"&gt;function&lt;/span&gt; &lt;span class="c1"&gt;#8 with parameters {&amp;#39;x&amp;#39;: 0, &amp;#39;y&amp;#39;: 3}&lt;/span&gt;
-&lt;span class="n"&gt;Submitting&lt;/span&gt; &lt;span class="n"&gt;function&lt;/span&gt; &lt;span class="c1"&gt;#9 with parameters {&amp;#39;x&amp;#39;: 2, &amp;#39;y&amp;#39;: 2}&lt;/span&gt;
+&lt;span class="n"&gt;Submitting&lt;/span&gt; &lt;span class="n"&gt;function&lt;/span&gt; &lt;span class="c1"&gt;#5 with arguments {&amp;#39;x&amp;#39;: 0, &amp;#39;y&amp;#39;: 2}&lt;/span&gt;
+&lt;span class="n"&gt;Submitting&lt;/span&gt; &lt;span class="n"&gt;function&lt;/span&gt; &lt;span class="c1"&gt;#6 with arguments {&amp;#39;x&amp;#39;: 0, &amp;#39;y&amp;#39;: 3}&lt;/span&gt;
+&lt;span class="n"&gt;Submitting&lt;/span&gt; &lt;span class="n"&gt;function&lt;/span&gt; &lt;span class="c1"&gt;#7 with arguments {&amp;#39;x&amp;#39;: 2, &amp;#39;y&amp;#39;: 0}&lt;/span&gt;
+&lt;span class="n"&gt;Submitting&lt;/span&gt; &lt;span class="n"&gt;function&lt;/span&gt; &lt;span class="c1"&gt;#8 with arguments {&amp;#39;x&amp;#39;: 0, &amp;#39;y&amp;#39;: 3}&lt;/span&gt;
+&lt;span class="n"&gt;Submitting&lt;/span&gt; &lt;span class="n"&gt;function&lt;/span&gt; &lt;span class="c1"&gt;#9 with arguments {&amp;#39;x&amp;#39;: 2, &amp;#39;y&amp;#39;: 2}&lt;/span&gt;
 &lt;span class="n"&gt;Waiting&lt;/span&gt; &lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="n"&gt;results&lt;/span&gt;&lt;span class="o"&gt;..&lt;/span&gt;
 &lt;span class="n"&gt;Total&lt;/span&gt; &lt;span class="n"&gt;run&lt;/span&gt; &lt;span class="n"&gt;time&lt;/span&gt; &lt;span class="n"&gt;of&lt;/span&gt; &lt;span class="mi"&gt;5&lt;/span&gt; &lt;span class="n"&gt;seconds&lt;/span&gt; &lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="n"&gt;function&lt;/span&gt;  &lt;span class="c1"&gt;#1 called with ({&amp;#39;x&amp;#39;: 0, &amp;#39;y&amp;#39;: 3},), {}&lt;/span&gt;
 &lt;span class="n"&gt;Total&lt;/span&gt; &lt;span class="n"&gt;run&lt;/span&gt; &lt;span class="n"&gt;time&lt;/span&gt; &lt;span class="n"&gt;of&lt;/span&gt; &lt;span class="mi"&gt;5&lt;/span&gt; &lt;span class="n"&gt;seconds&lt;/span&gt; &lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="n"&gt;function&lt;/span&gt;  &lt;span class="c1"&gt;#3 called with ({&amp;#39;x&amp;#39;: 0, &amp;#39;y&amp;#39;: 3},), {}&lt;/span&gt;
@@ -164,15 +164,16 @@ The second batch of jobs is launched a second later and has four seconds
 to wait until the cache is ready. &lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;Why you probably shouldn't use this code as-is&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;Adding the missing 'typed' decorator argument (when typed=True,  _make_key
-treats 3 and 3.0 differently) is relatively straightforward,I just wanted 
+treats 3 and 3.0 differently) is relatively straightforward - I just wanted 
 to avoid here the extra level of indentation that comes when implementing 
 a parametrized decorator. 
 The trickier part is implementing 'max_size'. When len(lock_dict)&amp;gt;max_size, 
 old Locks need to be discarded. Therefore, we need to know which locks are 
-'old' (an OrderedDict might help) and we need to check len(lock_dict(
+'old' (an OrderedDict might help) and we need to check len(lock_dict)
 each time we insert a new key/threadlock pair. Since several threads might 
 attempt to add several different keys, another lock is needed to make access 
 to lock_dict threadsafe. This might not affect performance in a significant 
 way in most scenarios, but bugs me on a personal level since function calls 
 might briefly wait on each other even when they are not duplicates and when 
-a cached result is already available.&lt;/p&gt;</summary><category term="python"></category><category term="decorator"></category><category term="multi-threading"></category></entry></feed>
+a cached result is already available. A variation of a &lt;a href="https://www.safaribooksonline.com/library/view/python-cookbook/0596001673/ch06s04.html"&gt;reader-writer lock&lt;/a&gt;
+might bring the time each thread spends holding the lock unnecessarily down to a minimum.&lt;/p&gt;</summary><category term="python"></category><category term="decorator"></category><category term="multi-threading"></category></entry></feed>
